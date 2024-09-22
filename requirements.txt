@@ -1,0 +1,8 @@
+keyboard
+pyperclip
+anthropic
+python-dotenv
+customtkinter
+pillow
+pystray
+screeninfo
