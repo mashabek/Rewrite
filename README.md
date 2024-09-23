@@ -4,7 +4,7 @@ Tired of bouncing between your work and online grammar checkers? Rewrite will he
 
 I have been using it for my personal needs. Before large language models, I utilized AI translators with multiple round trips, as I found they did a decent job of rewriting text. With the capabilities of large language models, the process can be taken even further. My main point is we all have LLM subscriptions and I stongly believe we should utilize them as much as we can.
 
-![Rewriter Logo](https://via.placeholder.com/150?text=Rewriter)
+![Rewriter Demo](rewriter.gif)
 
 ## What it does 🚀
 
