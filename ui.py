@@ -202,6 +202,27 @@ class RewriterApp:
 
     @staticmethod
     def create_image():
+        # Path to your favicon file
+        favicon_path = os.path.join(os.path.dirname(__file__), 'favicon.ico')
+        
+        if os.path.exists(favicon_path):
+            # Open the favicon file
+            with Image.open(favicon_path) as img:
+                # Convert to RGBA if it's not already
+                img = img.convert('RGBA')
+                
+                # Resize to 128x128 if needed
+                if img.size != (128, 128):
+                    img = img.resize((128, 128), Image.LANCZOS)
+                
+                return img
+        else:
+            # Fallback to the original image creation if favicon is not found
+            return RewriterApp.create_default_image()
+
+    @staticmethod
+    def create_default_image():
+        # Move the original image creation code here
         width = 128
         height = 128
         background_color = (52, 152, 219)  # A nice blue color
