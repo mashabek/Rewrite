@@ -45,7 +45,7 @@ via the system tray icon 🖥️
 
 ## Tech Stuff (for the curious) 🤓
 
-Built with Python 🐍, customtkinter 🖌️, and some clever API usage 🧠.
+Built with Python 🐍, customtkinter 🖌️, and mainly LLM 🧠.
 
 ## Contribute 🤝
 
