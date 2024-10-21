@@ -1,55 +1,59 @@
-import keyboard
 import threading
-import time
 import sys
 from ui import RewriterApp
 from text_processor import TextProcessor
+from logger import default_logger, log_stream
+from pynput import keyboard
 
 IS_MAC = sys.platform == "darwin"
-MODIFIER_KEY = "command" if IS_MAC else "ctrl"
+MODIFIER_KEY = keyboard.Key.cmd if IS_MAC else keyboard.Key.ctrl
 
 class Rewriter:
     def __init__(self):
-        self.ui = RewriterApp()
+        self.ui = RewriterApp(log_stream)
         self.text_processor = TextProcessor(self.ui)
         self.running = True
+        self.listener = None
 
-    def register_hotkeys(self):
-        while self.running:
-            try:
-                correction_hotkey = self.ui.settings.get("correction_hotkey", f"{MODIFIER_KEY}+D")
-                quit_hotkey = self.ui.settings.get("quit_hotkey", f"{MODIFIER_KEY}+Q")
-                keyboard.add_hotkey(correction_hotkey, self.text_processor.get_selected_text)
-                keyboard.add_hotkey(quit_hotkey, self.stop)
-                print("Hotkeys registered")
-                break
-            except keyboard.InvalidKeyError:
-                print("Failed to register hotkeys. Retrying in 1 second...")
-                time.sleep(1)
+    def setup_hotkeys(self):
+        def on_activate_correction():
+            self.text_processor.get_selected_text()
+
+        def on_activate_quit():
+            self.stop()
+
+        correction_key = self.ui.settings.get("correction_hotkey", "d")
+        quit_key = self.ui.settings.get("quit_hotkey", "q")
+
+        self.listener = keyboard.GlobalHotKeys({
+            f'<ctrl>+<alt>+h': on_activate_correction,
+            f'<ctrl>+<alt>+q': on_activate_quit
+        })
+        self.listener.start()
+        default_logger.info(f"Hotkeys registered: Correction: {MODIFIER_KEY}+alt+{correction_key}, Quit: {MODIFIER_KEY}+alt+{quit_key}")
 
     def run(self):
-        print("Starting Rewriter...")
-        print(f"Press {MODIFIER_KEY}+d to rewrite text.")
-        print(f"Press {MODIFIER_KEY}+q to quit the app.")
+        default_logger.info("Starting Rewriter...")
+        default_logger.info(f"Press {MODIFIER_KEY}+alt+d to rewrite text.")
+        default_logger.info(f"Press {MODIFIER_KEY}+alt+q to quit the app.")
         
-        # Register hotkeys in a separate thread
-        hotkey_thread = threading.Thread(target=self.register_hotkeys)
-        hotkey_thread.daemon = True
-        hotkey_thread.start()
+        self.setup_hotkeys()
         
         # Run the UI
         self.ui.run()
 
     def stop(self):
         self.running = False
+        if self.listener:
+            self.listener.stop()
         self.text_processor.stop()
         self.ui.quit_app()
-        print("Shutting down Rewriter...")
-        keyboard.unhook_all()  # Remove all keyboard hooks
+        default_logger.info("Shutting down Rewriter...")
         self.ui.root.quit()  # Force quit the Tkinter root
         self.ui.root.destroy()  # Destroy the Tkinter root
         sys.exit(0)
 
 if __name__ == "__main__":
+    default_logger.info("Starting Rewriter application")
     app = Rewriter()
     app.run()

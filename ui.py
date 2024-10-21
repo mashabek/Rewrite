@@ -3,8 +3,6 @@ import tkinter as tk
 from PIL import Image, ImageDraw, ImageFont
 from pystray import Icon, Menu, MenuItem
 import threading
-import logging
-from screeninfo import get_monitors
 import pyautogui
 import queue
 import pyperclip
@@ -12,15 +10,18 @@ import keyboard
 import json
 import os
 import keyring
+import sys
+import traceback
+from logger import default_logger, log_stream
+from screeninfo import get_monitors
 
 MODIFIER_KEY = "ctrl"
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
 
 class RewriterApp:
-    def __init__(self):
+    def __init__(self, log_stream):
         self.root = ctk.CTk()
         self.root.withdraw()
         self.popup = None
@@ -29,12 +30,27 @@ class RewriterApp:
         self.setup_tray_icon()
         self.queue = queue.Queue()
         self.root.after(100, self.check_queue)
+        self.log_stream = log_stream
+        self.log_window = None
+        
+        # Add this line to redirect stdout to our log stream
+        sys.stdout = log_stream
+        
+        # Set up custom Tkinter exception handler
+        ctk.CTk.report_callback_exception = self.handle_tk_exception
+
+    def handle_tk_exception(self, exc, val, tb):
+        err_msg = f"Tkinter Error:\n{''.join(traceback.format_exception(exc, val, tb))}"
+        default_logger.error(err_msg)
+        # Optionally, you can show an error message to the user
+        # tk.messagebox.showerror("Error", f"An error occurred:\n{str(val)}")
 
     def setup_tray_icon(self):
         image = self.create_image()
         menu = Menu(
             MenuItem('Settings', self.show_settings),
             MenuItem('About', self.show_about),
+            MenuItem('Show Logs', self.show_logs),  # Add this line
             MenuItem('Quit', self.quit_app)
         )
         self.icon = Icon("Grammar Correction", image, "Grammar Correction", menu)
@@ -42,7 +58,11 @@ class RewriterApp:
     def run(self):
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
         threading.Thread(target=self.icon.run, daemon=True).start()
-        self.root.mainloop()
+        try:
+            self.root.mainloop()
+        except Exception as e:
+            default_logger.error(f"Error in main loop: {str(e)}")
+            default_logger.error(traceback.format_exc())
 
     def check_queue(self):
         try:
@@ -124,24 +144,9 @@ class RewriterApp:
     def on_popup_close(self):
         if self.popup:
             try:
-                # Cancel any pending after callbacks
-                # for after_id in self.popup.tk.eval('after info').split():
-                #     try:
-                #         self.popup.after_cancel(after_id)
-                #     except tk.TclError:
-                #         pass  # Ignore errors for individual after_cancel calls
-                
-                # # Destroy all child widgets first
-                # for widget in self.popup.winfo_children():
-                #     try:
-                #         widget.destroy()
-                #     except tk.TclError:
-                #         pass  # Ignore errors for individual widget destruction
-                
-                # Now destroy the popup
                 self.popup.destroy()
             except tk.TclError as e:
-                logging.error(f"Error while closing popup: {e}")
+                default_logger.error(f"Error while closing popup: {e}")
             finally:
                 self.popup = None
 
@@ -308,6 +313,37 @@ class RewriterApp:
         ctk.CTkLabel(frame, text="Version 1.0").pack(pady=(0, 10))
         ctk.CTkLabel(frame, text="Author: @mashabek").pack(pady=(0, 10))
 
+    def show_logs(self):
+        if self.log_window is None or not self.log_window.winfo_exists():
+            self.log_window = ctk.CTkToplevel(self.root)
+            self.log_window.title("Logs")
+            self.log_window.geometry("800x600")
+            self.log_window.protocol("WM_DELETE_WINDOW", self.on_log_window_close)
+
+            frame = ctk.CTkFrame(self.log_window)
+            frame.pack(fill="both", expand=True, padx=20, pady=20)
+
+            self.log_text = ctk.CTkTextbox(frame, wrap="word", state="disabled")
+            self.log_text.pack(fill="both", expand=True)
+
+            refresh_button = ctk.CTkButton(frame, text="Refresh", command=self.refresh_logs)
+            refresh_button.pack(pady=(10, 0))
+
+        self.refresh_logs()
+        self.log_window.lift()
+        self.log_window.focus_force()
+
+    def refresh_logs(self):
+        if self.log_text:
+            self.log_text.configure(state="normal")
+            self.log_text.delete("1.0", "end")
+            self.log_text.insert("end", self.log_stream.getvalue())
+            self.log_text.configure(state="disabled")
+            self.log_text.see("end")
+
+    def on_log_window_close(self):
+        self.log_window.destroy()
+        self.log_window = None
 
     def load_settings(self):
         try:
